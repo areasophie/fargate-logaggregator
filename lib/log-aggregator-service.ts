@@ -4,10 +4,14 @@ import * as ec2 from '@aws-cdk/aws-ec2';
 import * as elbv2 from '@aws-cdk/aws-elasticloadbalancingv2';
 import * as ecs from '@aws-cdk/aws-ecs';
 import * as logs from '@aws-cdk/aws-logs';
+import * as s3 from '@aws-cdk/aws-s3';
 
 export class LogAggregatorService extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, cluster: ecs.Cluster, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // Log Store
+    const s3LogStore = new s3.Bucket(this, 'log-store');
 
     // Load Balancer
     const targetGroup = new elbv2.NetworkTargetGroup(this, 'logaggregator-target', {
@@ -33,7 +37,6 @@ export class LogAggregatorService extends cdk.Stack {
       logGroupName: this.node.tryGetContext('log-aggregator-demo')
     });
 
-
     // Task Def
     const executionRole = new iam.Role(this, 'EcsTaskExecutionRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
@@ -44,6 +47,15 @@ export class LogAggregatorService extends cdk.Stack {
     const taskRole = new iam.Role(this, 'EcsServiceTaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
+    const s3ListStatement = new iam.PolicyStatement();
+    s3ListStatement.addActions('s3:ListBucket');
+    s3ListStatement.addResources(s3LogStore.bucketArn);
+    const s3ReadWriteStatement = new iam.PolicyStatement();
+    s3ReadWriteStatement.addActions('s3:*Object');
+    s3ReadWriteStatement.addResources(`${s3LogStore.bucketArn}/*`);
+    taskRole.addToPrincipalPolicy(s3ListStatement);
+    taskRole.addToPrincipalPolicy(s3ReadWriteStatement);
+
     const taskDef = new ecs.FargateTaskDefinition(this, 'taskDef', {
       memoryLimitMiB: 512,
       cpu: 256,
@@ -51,11 +63,15 @@ export class LogAggregatorService extends cdk.Stack {
       taskRole,
     });
     const mainContainer = taskDef.addContainer('main', {
-        image: ecs.ContainerImage.fromRegistry('quay.io/literalice/syslog-fluent-bit:0.3'),
+        image: ecs.ContainerImage.fromRegistry('quay.io/literalice/syslog-fluent-bit:0.4'),
         logging: ecs.LogDriver.awsLogs({
           streamPrefix: 'logaggregator-demo',
           logGroup,
         }),
+        environment: {
+          'S3_BUCKET': s3LogStore.bucketName,
+          'S3_REGION': cdk.Stack.of(this).region,
+        }
     });
     mainContainer.addPortMappings({
       protocol: ecs.Protocol.UDP,
