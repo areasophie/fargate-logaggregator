@@ -1,14 +1,23 @@
-# Welcome to your CDK TypeScript project!
+# Fargate Syslog Aggregator Sample
 
-This is a blank project for TypeScript development with CDK.
+rsyslog(UDP) -> NLB -> fluent-bit on Fargate -> S3
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+### fluent-bit on Fargate
 
-## Useful commands
+```
+$ npm run cdk deploy -- log-aggregator
+```
 
- * `npm run build`   compile typescript to js
- * `npm run watch`   watch for changes and compile
- * `npm run test`    perform the jest unit tests
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
+## rsyslog
+
+```
+$ npm run cdk deploy -- log-publisher -c keypair=<YOUR KEY PAIR>
+```
+
+## Confirm logs
+
+```
+$ ssh ec2-user@<publisher ip>
+$ NLB_IP=`dig +short <NLB_DNS>`
+$ logger -i -d -t "sample" -n $NLB IP "hello,world"
+```
