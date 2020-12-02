@@ -63,7 +63,7 @@ export class LogAggregatorService extends cdk.Stack {
       taskRole,
     });
     const mainContainer = taskDef.addContainer('main', {
-        image: ecs.ContainerImage.fromRegistry('quay.io/literalice/syslog-fluent-bit:0.4'),
+        image: ecs.ContainerImage.fromRegistry('public.ecr.aws/p8a1p8y3/syslog-fluent-bit:0.4'),
         logging: ecs.LogDriver.awsLogs({
           streamPrefix: 'logaggregator-demo',
           logGroup,
